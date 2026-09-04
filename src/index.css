@@ -1,0 +1,20 @@
+/* Reset mínimo. Todo el diseño de la app vive dentro de App.jsx,
+   así el componente se puede mover a otro proyecto sin romperse. */
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: #EEF0E4;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Evita el zoom automático de iOS al tocar un campo */
+@media (max-width: 480px) {
+  input, select, textarea { font-size: 16px !important; }
+}
