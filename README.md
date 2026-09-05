@@ -10,7 +10,9 @@ Stack: **React + Vite** (frontend) · **Supabase** (base de datos y tiempo real)
 
 ## Qué hace
 
-- **Perfiles**: Jhona, Katy, los que quieras. Cada uno ve sus metas y hábitos.
+- **Cuentas con login**: cada persona se registra con su mail y contraseña. Los datos de una cuenta son invisibles para las demás (lo garantiza la base de datos, no la app).
+- **Casas compartidas**: si querés compartir con tu pareja, le pasás un código de invitación y pasan a ver lo mismo.
+- **Perfiles dentro de la casa**: Jhona, Katy, los que quieras. Cada uno ve sus metas y hábitos.
 - **Compartido**: al crear una meta, hábito o reto podés marcarlo como compartido y lo ven todos.
 - **Finanzas únicas**: los movimientos son de la casa. Si vos cargás el arroz, ella lo ve al instante.
 - **Tiempo real**: cambios sincronizados entre dispositivos sin recargar.
@@ -47,11 +49,16 @@ Abrí `.env` y completá:
 ```
 VITE_SUPABASE_URL=https://tuproyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-VITE_WORKSPACE_ID=casa
 ```
 
-> `VITE_WORKSPACE_ID` es el identificador de tu casa. Todos los dispositivos
-> que usen el mismo valor comparten los datos. Dejá `casa` si no te importa.
+> Ya no hace falta `VITE_WORKSPACE_ID`: ahora cada usuario tiene su casa
+> propia, creada automáticamente al registrarse.
+
+### 2.b Activar el login por mail
+
+En Supabase, andá a **Authentication → Sign In / Providers** y verificá que
+**Email** esté habilitado. Si no querés tener que confirmar el mail cada vez
+que creás una cuenta, desactivá ahí la opción **Confirm email**.
 
 ### 4. Probar en tu máquina
 
@@ -87,7 +94,6 @@ git push -u origin main
 |---|---|---|
 | `VITE_SUPABASE_URL` | tu Project URL | conectar con la base |
 | `VITE_SUPABASE_ANON_KEY` | tu anon key | conectar con la base |
-| `VITE_WORKSPACE_ID` | `casa` | identificar tu hogar |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` | que funcione la IA |
 
 4. **Deploy**.
@@ -127,6 +133,20 @@ bitacora/
 
 ---
 
+## Cómo compartir la app con alguien
+
+**Si querés compartir tu casa** (por ejemplo con tu pareja, para llevar las
+finanzas juntos): entrá al menú **Cuenta** (el ícono de persona, arriba a la
+derecha), copiá el **código de invitación** y pasáselo. La otra persona se
+crea su cuenta, entra a Cuenta, pega el código y toca "Unirme". A partir de
+ahí ven exactamente lo mismo.
+
+**Si querés que use la app pero con sus datos aparte**: pasale solo la URL.
+Se registra con su mail y listo — tiene su propia casa, y no ve nada de lo
+tuyo ni vos de lo suyo.
+
+---
+
 ## Cómo se guardan los datos
 
 Todo el estado (perfiles, metas, hábitos, finanzas) se guarda como **un único
@@ -146,14 +166,14 @@ cambios llegan al instante por el canal de tiempo real.
 
 ## Seguridad
 
-El `schema.sql` deja activa una política **abierta**: cualquiera con la URL y
-la anon key puede leer y escribir. Es lo más simple y funciona bien para uso
-familiar, **pero no publiques la URL de tu app**.
+El aislamiento entre cuentas está hecho con **Row Level Security** de Postgres:
+las políticas del `schema.sql` hacen que cada consulta solo pueda tocar filas
+de los hogares donde el usuario es miembro. No es una validación de la interfaz
+que se pueda saltear tocando la URL o abriendo la consola del navegador: la
+base de datos directamente no devuelve esos datos.
 
-Si querés cerrarlo de verdad, en `supabase/schema.sql` está comentada la
-**Opción B**: exige usuario logueado. Para activarla hay que prender el login
-por email en Supabase (**Authentication → Providers**) y agregar una pantalla
-de login. Avisame si querés que la agregue.
+La `anon key` es pública por diseño (viaja al navegador en cualquier app de
+Supabase); lo que protege los datos son las políticas, no esa clave.
 
 ---
 
@@ -177,5 +197,13 @@ IA localmente usá `vercel dev` (con el CLI de Vercel instalado), o probala
 directo en el deploy.
 
 **Los cambios no llegan al otro dispositivo**
-Verificá que el paso 3 del `schema.sql` (el bloque de tiempo real) haya
-corrido bien, y que ambos dispositivos usen el mismo `VITE_WORKSPACE_ID`.
+Verificá que el bloque de tiempo real del `schema.sql` haya corrido bien, y
+que ambas personas estén en la misma casa (mismo código de invitación).
+
+**"No pude cargar tu casa"**
+Suele ser que el `schema.sql` nuevo no se ejecutó completo. Corrélo otra vez:
+está escrito para poder repetirse sin romper nada.
+
+**Al registrarme no pasa nada**
+Si en Supabase está activo "Confirm email", primero tenés que abrir el mail de
+confirmación. Podés desactivarlo en Authentication → Sign In / Providers → Email.

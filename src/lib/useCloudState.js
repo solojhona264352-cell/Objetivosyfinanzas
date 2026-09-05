@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase, supabaseReady, WORKSPACE_ID, CLIENT_ID } from "./supabase";
+import { supabase, supabaseReady, CLIENT_ID } from "./supabase";
 
-const LOCAL_KEY = `bitacora:${WORKSPACE_ID}`;
+
 
 /**
  * Mantiene un estado sincronizado con Supabase en tiempo real.
@@ -19,7 +19,8 @@ const LOCAL_KEY = `bitacora:${WORKSPACE_ID}`;
  * en momentos distintos alcanza de sobra. Si ambos editan exactamente el
  * mismo dato en el mismo segundo, prevalece el último en guardar.
  */
-export function useCloudState(initialValue) {
+export function useCloudState(initialValue, workspaceId) {
+  const LOCAL_KEY = `bitacora:${workspaceId || "sin-hogar"}`;
   const [state, setState] = useState(initialValue);
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState(supabaseReady ? "conectando" : "local");
@@ -46,12 +47,12 @@ export function useCloudState(initialValue) {
       }
 
       // 2) Después, lo que haya en la nube (manda esto)
-      if (supabaseReady) {
+      if (supabaseReady && workspaceId) {
         try {
           const { data, error } = await supabase
             .from("bitacora_state")
             .select("data")
-            .eq("id", WORKSPACE_ID)
+            .eq("id", workspaceId)
             .maybeSingle();
 
           if (error) throw error;
@@ -73,21 +74,21 @@ export function useCloudState(initialValue) {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [workspaceId]);
 
   // ---- Escucha de cambios del otro dispositivo --------------------------
   useEffect(() => {
-    if (!supabaseReady) return;
+    if (!supabaseReady || !workspaceId) return;
 
     const channel = supabase
-      .channel(`bitacora-${WORKSPACE_ID}`)
+      .channel(`bitacora-${workspaceId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "bitacora_state",
-          filter: `id=eq.${WORKSPACE_ID}`
+          filter: `id=eq.${workspaceId}`
         },
         (payload) => {
           const row = payload.new;
@@ -107,7 +108,7 @@ export function useCloudState(initialValue) {
       });
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [workspaceId]);
 
   // ---- Guardado (local siempre, nube con debounce) ----------------------
   useEffect(() => {
@@ -115,7 +116,7 @@ export function useCloudState(initialValue) {
 
     try { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); } catch (e) {}
 
-    if (!supabaseReady) return;
+    if (!supabaseReady || !workspaceId) return;
 
     pendingRef.current = true;
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -126,7 +127,7 @@ export function useCloudState(initialValue) {
         const { error } = await supabase
           .from("bitacora_state")
           .upsert(
-            { id: WORKSPACE_ID, data: stateRef.current, updated_by: CLIENT_ID },
+            { id: workspaceId, data: stateRef.current, updated_by: CLIENT_ID },
             { onConflict: "id" }
           );
         if (error) throw error;
@@ -140,7 +141,7 @@ export function useCloudState(initialValue) {
     }, 600);
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [state, loaded]);
+  }, [state, loaded, workspaceId]);
 
   const update = useCallback((updater) => {
     setState((prev) => (typeof updater === "function" ? updater(prev) : updater));

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useCloudState } from "./lib/useCloudState";
+import { useAuth } from "./lib/useAuth";
+import { AuthScreen, AccountModal } from "./components/Auth.jsx";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
 import {
   Compass, Home, Target, Flame, CheckSquare, Wallet, BookOpen, Plus, Trash2,
   Pencil, X, Check, ChevronLeft, ChevronRight, PiggyBank, Stamp, TrendingUp,
-  TrendingDown, Landmark, Loader2, ListPlus, Sparkles, Wand2, AlertTriangle, Trophy, Users, UserPlus, ImagePlus, Cloud, CloudOff
+  TrendingDown, Landmark, Loader2, ListPlus, Sparkles, Wand2, AlertTriangle, Trophy, Users, UserPlus, ImagePlus, Cloud, CloudOff, UserCircle
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
@@ -2179,8 +2181,10 @@ function buildInitialRoot() {
   };
 }
 
-function App() {
-  const { state: rootRaw, setState: setRoot, loaded, status } = useCloudState(null);
+function App({ auth }) {
+  const householdId = auth.household ? auth.household.id : null;
+  const { state: rootRaw, setState: setRoot, loaded, status } = useCloudState(null, householdId);
+  const [showAccount, setShowAccount] = useState(false);
   const [activeTab, setActiveTab] = useState("resumen");
   const [showReset, setShowReset] = useState(false);
   const [showDemoConfirm, setShowDemoConfirm] = useState(false);
@@ -2417,6 +2421,7 @@ function App() {
               </button>
             ))}
             <button className="los-icon-btn" onClick={() => setShowProfiles(true)} aria-label="Administrar perfiles" title="Administrar perfiles"><Users size={16} /></button>
+            <button className="los-icon-btn" onClick={() => setShowAccount(true)} aria-label="Cuenta" title="Cuenta y compartir"><UserCircle size={16} /></button>
           </div>
         </div>
         <nav className="los-tabs">
@@ -2455,6 +2460,8 @@ function App() {
           <button className="los-link-btn" onClick={() => setShowReset(true)}>Borrar todos los datos</button>
         </div>
       </footer>
+
+      {showAccount && <AccountModal auth={auth} onClose={() => setShowAccount(false)} />}
 
       {showProfiles && (
         <ProfilesModal
@@ -2517,10 +2524,52 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+function Root() {
+  const auth = useAuth();
+
+  if (auth.checking) {
+    return (
+      <div className="los-app los-loading">
+        <style>{CSS}</style>
+        <Loader2 className="spin" size={26} />
+        <span>Abriendo tu bitácora...</span>
+      </div>
+    );
+  }
+
+  if (!auth.session) {
+    return (
+      <div className="los-app">
+        <style>{CSS}</style>
+        <AuthScreen auth={auth} />
+      </div>
+    );
+  }
+
+  if (!auth.household) {
+    return (
+      <div className="los-app los-loading">
+        <style>{CSS}</style>
+        {auth.error
+          ? <div className="los-crash">
+              <AlertTriangle size={26} />
+              <h2>No pude cargar tu casa</h2>
+              <p>{auth.error}</p>
+              <button className="los-btn los-btn-primary" onClick={auth.reloadHousehold}>Reintentar</button>
+              <button className="los-link-btn" onClick={auth.signOut}>Cerrar sesión</button>
+            </div>
+          : <><Loader2 className="spin" size={26} /><span>Preparando tu casa...</span></>}
+      </div>
+    );
+  }
+
+  return <App auth={auth} />;
+}
+
 function AppWithBoundary() {
   return (
     <ErrorBoundary>
-      <App />
+      <Root />
     </ErrorBoundary>
   );
 }
@@ -2726,6 +2775,25 @@ const CSS = `
 .los-shared-line { background: var(--azulLight); border: 1px solid rgba(47,85,112,0.25); border-radius: 8px; padding: 9px 11px; color: var(--azul); }
 .los-shared-line svg { flex-shrink: 0; }
 .los-shared-note { display: flex; align-items: center; gap: 7px; background: var(--azulLight); color: var(--azul); font-size: 12.5px; font-weight: 600; padding: 9px 12px; border-radius: 8px; margin-bottom: 14px; }
+
+.los-auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.los-auth-card { background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; padding: 26px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 40px rgba(27,43,40,0.08); }
+.los-auth-brand { display: flex; align-items: center; gap: 11px; color: var(--ink); margin-bottom: 4px; }
+.los-auth-brand h1 { font-family: 'Fraunces', serif; font-size: 23px; margin: 0; }
+.los-auth-brand span { font-size: 11.5px; color: var(--slate); text-transform: uppercase; letter-spacing: 0.6px; }
+.los-auth-tabs { display: flex; border: 1.5px solid var(--line); border-radius: 9px; overflow: hidden; }
+.los-auth-tabs button { flex: 1; padding: 10px; background: var(--card); border: none; font-family: 'IBM Plex Sans'; font-size: 13.5px; font-weight: 600; color: var(--slate); cursor: pointer; }
+.los-auth-tabs button.active { background: var(--ink); color: var(--paper); }
+.los-auth-submit { justify-content: center; padding: 11px; margin-top: 4px; }
+.los-auth-link { align-self: center; }
+.los-auth-info { font-size: 12.5px; color: var(--forest); background: var(--forestLight); padding: 9px 11px; border-radius: 8px; margin: 0; line-height: 1.5; }
+.los-auth-foot { font-size: 11.5px; color: var(--slate); line-height: 1.55; margin: 6px 0 0; text-align: center; }
+
+.los-invite-box { display: flex; align-items: center; gap: 10px; background: var(--brassLight); border: 1.5px solid var(--brass); border-radius: 10px; padding: 10px 12px; flex-wrap: wrap; }
+.los-invite-box code { font-family: 'IBM Plex Mono'; font-size: 19px; font-weight: 600; letter-spacing: 2px; color: #6E5217; flex: 1; }
+.los-id-box { margin-top: 12px; background: var(--paper2); border-radius: 9px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+.los-id-box span { font-size: 11px; color: var(--slate); }
+.los-id-box code { font-family: 'IBM Plex Mono'; font-size: 11.5px; word-break: break-all; color: var(--ink); }
 
 .los-profiles { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .los-profile-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 5px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--card); color: var(--slate); font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: 'IBM Plex Sans'; }
